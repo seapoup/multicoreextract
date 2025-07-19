@@ -26,27 +26,29 @@ jq -r \
   .directory as $d |
   [$a, ($ad + "/" + $a), $d, ($dd + "/" + $d), $la, $lu] |
   @tsv
-  ' "$JSON_FILE" | parallel --colsep '\t' -j"$MAX_JOBS" "
-  archive_name="{1}"
-  archive_path="{2}"
-  dest_folder="{3}"
-  output_dir="{4}"
-  LOG_ARCHIVE="{5}"
-  LOG_UNAVAILABLE="{6}"
-  if [[ ! -f {2} ]]; then
-    tee -a {6} <<< \"Archive not found: {2}. Skipping.\"
+  ' "$JSON_FILE" | \
+parallel --colsep '\t' -j"$MAX_JOBS" --quote sh -c '
+  archive_name="$1"
+  archive_path="$2"
+  dest_folder="$3"
+  output_dir="$4"
+  LOG_ARCHIVE="$5"
+  LOG_UNAVAILABLE="$6"
+
+  if [ ! -f "$archive_path" ]; then
+    printf "Archive not found: $archive_path. Skipping.\n" | tee -a "$LOG_UNAVAILABLE"
   else
-    echo \"Extracting {1}\" >> {5}
-    case {1} in
+    printf "Extracting $archive_name\n" | tee -a "$LOG_ARCHIVE"
+    case "$archive_name" in
       *.rar|*.RAR)
-        unrar -y e {2} {4} >/dev/null
+        unrar -y e "$archive_path" "$output_dir" >/dev/null
         ;;
       *)
-        7z x -y {2} -o{4} >/dev/null
+        7z x -y "$archive_path" -o"$output_dir" >/dev/null
         ;;
-    esac 
+    esac
   fi
-"
+' _ {} {} {} {} {} {}
 
 # Calculate runtime
 END=$(date +%s)
